@@ -1,49 +1,42 @@
-### Описание алгоритмов работы Elasticsearch.
+# Оглавление
 
+1. [Поиск товаров](#_Toc90547690)
 
+	1. [Краткое описание поиска](#_Toc90547691)
 
+	2. [Особенности поиска](#_Toc90547694)
 
+		1. [Смена раскладки](#_Toc90547698)
 
+		2. [Блочная структура](#_Toc90547700)
 
+		3. [Поиск с приоритетами](#_Toc90547699)
 
+		4. [Сортировка по наличию в аптеках](#_Toc90547700)
 
+		5. [Экранирование спец символов](#_Toc90547702)
 
-### Оглавление
+		6. [Алгоритм поиска](#_Toc90547703)
 
-### 1.Поиск товаров
-  1. Краткое описание поиска
-  
-  2. Особенности поиска
-  
-  3. Поиск с приоритетами
-   
-  4. Смена раскладки
-  
-  5. Блочная структура.
-  
-  6. Поиск с приоритетом
-  
-  7. Сортировка по наличию в аптеках
- 
-  8. Экранирование спец. символов.
-   
-  9. Алгоритм поиска
-  
-  10. Короткие запросы
-  
-  11. Длинные запросы
-  
-  12. Символы в запросах
-  
-### 2. Бэкенд часть
-   1. Описание данных (Способ хранения в elasticsearch)
-   2. Анализаторы поиска
-   3. Формирование запроса к elasticsearch
-   4. Формирование поисковой части
-   5. Формирование фильтров
-   6. Поиск фильтров 
-   
+		7. [Короткие запросы](#_Toc90547695)
 
+		8. [Длинные запросы](#_Toc90547696)
+
+		9. [Символы в запросах](#_Toc90547697)
+
+2. [Бэкенд часть](#_Toc90547704)
+
+	1. [Описание данных (Способ хранения в elasticsearch)](#_Toc90547692)
+
+	2. [Анализаторы поиска](#_Toc90547693)
+
+	3. [Формирование запроса к elasticsearch](#_Toc90547705)
+
+	4. [Формирование поисковой части](#_Toc90547706)
+
+	5. [Формирование фильтров](#_Toc90547707)
+
+	6. [Поиск фильтров](#_Toc90547708)
 
 # Поиск товаров
 
@@ -85,7 +78,7 @@
 
 ### Поиск с приоритетами.
 
-Первый блок выдачи отдаётся для приоритетных товаров по действующему веществу search_rang 1.
+Первый блок выдачи отдаётся для приоритетных товаров по действующему веществу.
 
 ### Сортировка по наличию в аптеках.
 
@@ -1002,31 +995,23 @@ filter приводит все токены к нижнему регистру (
 
 С его помощь происходит проверка на наличие товара, хотя бы в одной из аптек, (в данном случае [1335, 12, 143]) а именно, существуют ли данные о товаре, в перечисленных аптеках, у которых значение поля stock больше 0. В этот же момент формируются фильтры по цене, в данном примере, фильтруется по минимальной и максимальной цене 0 и 150 соответственно (qte и lte)Отдельно формируются фильтры по действующему веществу (mnn):
 
-[{&quot;term&quot;: {
-
-&quot;mnn&quot;: &quot;Ибупрофен&quot;}},{
-
-&quot;term&quot;: {
-
-&quot;mnn&quot;: &quot;Аскорил&quot;}}]
-
-И отдельно формируются все остальные:
-
-{&quot;terms&quot;: {
-
-&quot;form&quot;: [
-
-&quot;таблетки&quot;,
-
-&quot;суспензия&quot;],
-
-&quot;maker&quot;: [
-
-&quot;Рус био пара гомео фарм&quot;]}}
-
+``` json
+[
+    {
+        "term": {
+            "mnn": "Ибупрофен"
+        }
+    },
+    {
+        "term": {
+            "mnn": "Аскорил"
+        }
+    }
+] 
+```
 Фильтры формируются по отдельности, потому что у них разная логика объединения. По действующему веществу (mnn) товар должен удовлетворять всем выбранным фильтрам, а по форме выпуска (form) и производителю (maker) хотя бы одному.
 
-## **Поиск фильтров**
+## Поиск фильтров
 
 Поиск фильтров можно описать как агрегацию поиска товаров. То есть на основе результатов поиска, собираются все поля mnn, form и maker (действующее вещество, форма выпуска и производитель соответственно), и передаются на фронтенд сайта, для отображения фильтров на странице Результатов поиска.
 
@@ -1036,214 +1021,239 @@ filter приводит все токены к нижнему регистру (
 
 Есть несколько агрегаций, которые идут с общим префиксом all, а именно запросы, которые относятся к чистому неотфильтрованному запросу:
 
-[{&quot;all\_mnns&quot;: {
-
-&quot;terms&quot;: {
-
-&quot;field&quot;: &quot;mnn.keyword&quot;,
-
-&quot;size&quot;: 500}}},{
-
-&quot;all\_makers&quot;: {
-
-&quot;terms&quot;: {
-
-&quot;field&quot;: &quot;maker&quot;,
-
-&quot;size&quot;: 500}}},{
-
-&quot;all\_forms&quot;: {
-
-&quot;terms&quot;: {
-
-&quot;field&quot;: &quot;form&quot;,
-
-&quot;size&quot;: 500}}},{
-
-&quot;all\_max&quot;: {
-
-&quot;children&quot;: {
-
-&quot;type&quot;: &quot;pharm&quot;},
-
-&quot;aggs&quot;: {
-
-&quot;ch&quot;: {
-
-&quot;max&quot;: {
-
-&quot;field&quot;: &quot;price&quot;}}}}},{
-
-&quot;all\_min&quot;: {
-
-&quot;children&quot;: {
-
-&quot;type&quot;: &quot;pharm&quot;},
-
-&quot;aggs&quot;: {
-
-&quot;ch&quot;: {
-
-&quot;min&quot;: {
-
-&quot;field&quot;: &quot;price&quot;}}}}}]
-
+``` json
+[
+    {
+        "all_mnns": {
+            "terms": {
+                "size": 500,
+                "field": "mnn.keyword"
+            }
+        }
+    },
+    {
+        "all_makers": {
+            "terms": {
+                "size": 500,
+                "field": "maker"
+            }
+        }
+    },
+    {
+        "all_forms": {
+            "terms": {
+                "size": 500,
+                "field": "form"
+            }
+        }
+    },
+    {
+        "all_max": {
+            "aggs": {
+                "ch": {
+                    "max": {
+                        "field": "price"
+                    }
+                }
+            },
+            "children": {
+                "type": "pharm"
+            }
+        }
+    },
+    {
+        "all_min": {
+            "aggs": {
+                "ch": {
+                    "min": {
+                        "field": "price"
+                    }
+                }
+            },
+            "children": {
+                "type": "pharm"
+            }
+        }
+    }
+]
+```
 В случае с mnn, maker и form это сбор значений из соответствующих полей, а в случае с all\_min и all\_max это сбор минимального и максимального значения из данных об остатках.
 
 Далее существуют и другие агрегации, которые нужны как раз для того, чтобы отфильтровывать текущий результат. То есть лишь те фильтры, которые можно применить к текущей выдаче.
 
 В примере ниже результат поиска фильтруется по действующему веществу (mnn), форме выпуска (form) и наличию (более подробно описано в разделе «Формирование фильтров»), в результате из него собираются все производители (maker):
 
-{&quot;makers&quot;: {
-
-&quot;filter&quot;: {
-
-&quot;bool&quot;: {
-
-&quot;must&quot;: [{
-
-&quot;bool&quot;: {
-
-&quot;must&quot;: &quot;Фильтрыпо mnn&quot;}},{
-
-&quot;bool&quot;: {
-
-&quot;should&quot;: &quot;Фильтрыпо form&quot;}},{
-
-&quot;bool&quot;: {
-
-&quot;should&quot;: &quot;Фильтры по наличию&quot;}}],
-
-&quot;aggs&quot;: {
-
-&quot;val&quot;: {
-
-&quot;terms&quot;: {
-
-&quot;field&quot;: &quot;maker&quot;,
-
-&quot;size&quot;: 500}}}}}}}
+``` json
+{
+    "makers": {
+        "filter": {
+            "bool": {
+                "aggs": {
+                    "val": {
+                        "terms": {
+                            "size": 500,
+                            "field": "maker"
+                        }
+                    }
+                },
+                "must": [
+                    {
+                        "bool": {
+                            "must": "Фильтрыпо mnn"
+                        }
+                    },
+                    {
+                        "bool": {
+                            "should": "Фильтрыпо form"
+                        }
+                    },
+                    {
+                        "bool": {
+                            "should": "Фильтры по наличию"
+                        }
+                    }
+                ]
+            }
+        }
+    }
+}
+```
 
 Аналогично выглядит запрос для формы выпуска (form), разницатолько в том, что результаты фильтруются не по форме выпуска (form) а по производителю (maker):
 
-{&quot;forms&quot;: {
-
-&quot;filter&quot;: {
-
-&quot;bool&quot;: {
-
-&quot;must&quot;: [{
-
-&quot;bool&quot;: {
-
-&quot;must&quot;: &quot;Фильтрыпо mnn&quot;}},{
-
-&quot;bool&quot;: {
-
-&quot;should&quot;: &quot;Фильтрыпо maker&quot;}},{
-
-&quot;bool&quot;: {
-
-&quot;should&quot;: &quot;Фильтры по наличию&quot;}}],
-
-&quot;aggs&quot;: {
-
-&quot;val&quot;: {
-
-&quot;terms&quot;: {
-
-&quot;field&quot;: &quot;form&quot;,
-
-&quot;size&quot;: 500}}}}}}}
+``` json
+{
+    "forms": {
+        "filter": {
+            "bool": {
+                "aggs": {
+                    "val": {
+                        "terms": {
+                            "size": 500,
+                            "field": "form"
+                        }
+                    }
+                },
+                "must": [
+                    {
+                        "bool": {
+                            "must": "Фильтрыпо mnn"
+                        }
+                    },
+                    {
+                        "bool": {
+                            "should": "Фильтрыпо maker"
+                        }
+                    },
+                    {
+                        "bool": {
+                            "should": "Фильтры по наличию"
+                        }
+                    }
+                ]
+            }
+        }
+    }
+}
+```
 
 Запрос по действующему веществу (mnn)отличается, потому что для действующего вещества (mnn)используется конъюнкция:
 
-{&quot;mnn&quot;: {
-
-&quot;filter&quot;: {
-
-&quot;bool&quot;: {
-
-&quot;must&quot;: [{
-
-&quot;bool&quot;: {
-
-&quot;must&quot;: &quot;Фильтрыпо mnn&quot;}},{
-
-&quot;bool&quot;: {
-
-&quot;should&quot;: &quot;Фильтрыпо form&quot;}},{
-
-&quot;bool&quot;: {
-
-&quot;should&quot;: &quot;Фильтрыпо maker&quot;}},{
-
-&quot;bool&quot;: {
-
-&quot;should&quot;: &quot;Фильтры по наличию&quot;}}],
-
-&quot;aggs&quot;: {
-
-&quot;val&quot;: {
-
-&quot;terms&quot;: {
-
-&quot;field&quot;: &quot;mnn&quot;,
-
-&quot;size&quot;: 500}}}}}}}
+``` json
+{
+    "mnn": {
+        "filter": {
+            "bool": {
+                "aggs": {
+                    "val": {
+                        "terms": {
+                            "size": 12500,
+                            "field": "mnn"
+                        }
+                    }
+                },
+                "must": [
+                    {
+                        "bool": {
+                            "must": "Фильтрыпо mnn"
+                        }
+                    },
+                    {
+                        "bool": {
+                            "should": "Фильтрыпо form"
+                        }
+                    },
+                    {
+                        "bool": {
+                            "should": "Фильтрыпо maker"
+                        }
+                    },
+                    {
+                        "bool": {
+                            "should": "Фильтры по наличию"
+                        }
+                    }
+                ]
+            }
+        }
+    }
+}
+```
 
 В запросе для цен, агрегировать нужно записи о наличие данного товара в аптеках (более подробно описано в разделе «Формирование фильтров»), а не поля из записей о товарах (mnn, maker, form):
 
-{&quot;price&quot;: {
-
-&quot;filter&quot;: {
-
-&quot;bool&quot;: {
-
-&quot;must&quot;: [{
-
-&quot;bool&quot;: {
-
-&quot;should&quot;: &quot;Фильтрыпо maker&quot;}},{
-
-&quot;bool&quot;: {
-
-&quot;should&quot;: &quot;Фильрыпо form&quot;}},{
-
-&quot;bool&quot;: {
-
-&quot;must&quot;: &quot;Фильтыпо mnn&quot;}}]}}},
-
-&quot;aggs&quot;: {
-
-&quot;ch&quot;: {
-
-&quot;children&quot;: {
-
-&quot;type&quot;: &quot;pharm&quot;},
-
-&quot;aggs&quot;: {
-
-&quot;stock&quot;: {
-
-&quot;filter&quot;: {
-
-&quot;bool&quot;: {
-
-&quot;filter&quot;: &quot;Фильтрыпоналичию&quot;}},
-
-&quot;aggs&quot;: {
-
-&quot;max&quot;: {
-
-&quot;max&quot;: {
-
-&quot;field&quot;: &quot;price&quot;}},
-
-&quot;min&quot;: {
-
-&quot;min&quot;: {
-
-&quot;field&quot;: &quot;price&quot;}
-
-
+``` json
+{
+    "aggs": {
+        "ch": {
+            "aggs": {
+                "stock": {
+                    "aggs": {
+                        "min": {
+                            "min": {
+                                "field": "price"
+                            }
+                        },
+                        "max": {
+                            "max": {
+                                "field": "price"
+                            }
+                        }
+                    },
+                    "filter": {
+                        "bool": {
+                            "filter": "Фильтрыпоналичию"
+                        }
+                    }
+                }
+            },
+            "children": {
+                "type": "pharm"
+            }
+        }
+    },
+    "price": {
+        "filter": {
+            "bool": {
+                "must": [
+                    {
+                        "bool": {
+                            "should": "Фильтрыпо maker"
+                        }
+                    },
+                    {
+                        "bool": {
+                            "should": "Фильрыпо form"
+                        }
+                    },
+                    {
+                        "bool": {
+                            "must": "Фильтыпо mnn"
+                        }
+                    }
+                ]
+            }
+        }
+    }
+}
+```
